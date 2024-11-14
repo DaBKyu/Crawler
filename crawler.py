@@ -35,7 +35,6 @@ STR_CRAWLING_PAGE_SIZE = 'crawlingPageSize'
 
 class DanawaCrawler:
     def __init__(self):
-        self.errorList = list()
         self.crawlingCategory = list()
         with open(CRAWLING_DATA_CSV_FILE, 'r', newline='') as file:
             for crawlingValues in csv.reader(file, skipinitialspace=True):
