@@ -8,7 +8,6 @@ import requests
 import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium_stealth import stealth
@@ -129,7 +128,14 @@ class Crawler:
             #상품 이름
             productName = item.find_element(By.CLASS_NAME, "prod_name").find_element(By.TAG_NAME, "a")
             productNameString = productName.text
-            print(productName.text)
+            print(productNameString)
+            if self.productSeqno < 41:
+                print(self.productSeqno)
+                self.productSeqno +=1
+                continue
+            else:
+                print(self.productSeqno)
+                self.productSeqno += 1
             
             #상품 가격
             priceText = item.find_element(By.CLASS_NAME, "price_sect").find_element(By.TAG_NAME, "a").text
@@ -143,14 +149,21 @@ class Crawler:
             time.sleep(random.uniform(2, 4))
 
             #상품 이름 클릭후 이동(상품 가격 리스트 페이지)
+            print("상품 이름 클릭 전")
             productName.click()
+            print("클릭 완료")
             time.sleep(random.uniform(3, 6))
+            print("창 이동 전")
             driver.switch_to.window(driver.window_handles[-1])
+            print("창 이동 완료")
 
             #상품 정보
+            print("상품 정보 찾기 전")
             productInfo = driver.find_element(By.XPATH, "//div[@class='items']").text
+            print("상품 정보 찾기 완료")
 
             #쇼핑몰 필터링
+            print("쇼핑몰 필터링 시작")
             mall_info = driver.find_element(By.XPATH, "//tr[@class='lowest']/td[@class='mall']/div/a").text
             if re.match(mall_info, "11번가"):
                 pass
@@ -161,6 +174,12 @@ class Crawler:
             elif re.match(mall_info, "옥션"):
                 pass
             else:
+                driver.switch_to.window(driver.window_handles[-1])
+                time.sleep(random.uniform(2, 4))
+                driver.close()
+                time.sleep(random.uniform(2, 4))
+                driver.switch_to.window(list_page_handle)
+                print("Back to list page.")
                 continue
 
             #최저가 사러가기 버튼 클릭 후 이동(상품 상세페이지)
