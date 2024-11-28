@@ -125,17 +125,17 @@ class Crawler:
 
         for item in items:
 
-            print("prodcutSeqno: " + self.productSeqno)
+            print(f"prodcutSeqno: {self.productSeqno}")
 
             #상품 이름
             productName = item.find_element(By.CLASS_NAME, "prod_name").find_element(By.TAG_NAME, "a")
             productNameString = productName.text
-            print("제품명: " + productNameString)
+            print(f"제품명: {productNameString}")
             
             #상품 가격
             priceText = item.find_element(By.CLASS_NAME, "price_sect").find_element(By.TAG_NAME, "a").text
             price = re.sub(r'\D', '', priceText)
-            print("제품 가격: " + price)
+            print(f"제품 가격: {price}")
 
             # 마우스 이동 시뮬레이션
             actions = ActionChains(driver)  # 액션 초기화
