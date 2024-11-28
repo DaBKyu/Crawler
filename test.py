@@ -193,6 +193,7 @@ class Crawler:
                 driver.execute_script(f"window.scrollBy(0, {scroll_position});")
                 time.sleep(random.uniform(2, 4))  # 무작위 대기 시간 추가
 
+            isSuccess = True
             #url 구분
             if re.match(r"^https://item\.gmarket", driver.current_url):
                 print("G마켓")
