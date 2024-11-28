@@ -219,7 +219,7 @@ class Crawler:
                 # 상품 정보 이미지
                 try:
                     # iframe 존재 여부 확인
-                    iframe = driver.find_element(By.ID, "detail1")
+                    iframe = driver.find_element(By.ID, "prdDescIfrm")
                     print("iframe이 발견되었습니다. iframe 내부 이미지를 처리합니다.")
                     self.imgDownAucGma(iframe, "11st", driver, actions, productNameString, infoFile_csvWriter, crawlingName)
                 except Exception as e:
