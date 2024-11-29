@@ -320,8 +320,6 @@ class Crawler:
             os.makedirs(category_folder)  # 카테고리 폴더가 없으면 생성
         
         for idx, img in enumerate(thumbnail_elements):
-            # 마우스 이동 시뮬레이션
-            actions.move_by_offset(10, 20).perform()
             time.sleep(random.uniform(2, 4))
 
             img_url = img.get_attribute("src")
@@ -366,10 +364,6 @@ class Crawler:
             os.makedirs(category_folder)  # 카테고리 폴더가 없으면 생성
 
         for idx, img in enumerate(thumbnail_elements):
-            # 마우스 이동 시뮬레이션
-            for _ in range(5):
-                actions.move_by_offset(10, 20).perform()  # 무작위 위치로 이동
-                time.sleep(random.uniform(2, 4))
             # 썸네일 마우스 이동
             actions.move_to_element(img)
             time.sleep(random.uniform(2, 4))
@@ -439,8 +433,6 @@ class Crawler:
             driver.execute_script("arguments[0].scrollIntoView();", img)
             time.sleep(0.5)  # 스크롤 후 잠시 대기
 
-            # 마우스 이동 시뮬레이션
-            actions.move_by_offset(10, 20).perform()
             time.sleep(random.uniform(1, 2))
 
             img_url = img.get_attribute("src")
