@@ -56,12 +56,9 @@ class Crawler:
         self.options.add_argument('--disable-gpu')
         self.options.add_experimental_option("detach", True)
 
-        if __name__ == '__main__':
-            # Pool에대한 학습필요
-            pool = Pool(processes=PROCESS_COUNT)
-            pool.map(self.CrawlingCategory, self.crawlingCategory)
-            pool.close()
-            pool.join()
+        # 멀티 프로세싱 대신 순차적으로 크롤링 실행
+        for categoryValue in self.crawlingCategory:
+            self.CrawlingCategory(categoryValue)
     
     
     def CrawlingCategory(self, categoryValue):
@@ -152,14 +149,18 @@ class Crawler:
             driver.switch_to.window(driver.window_handles[-1])
             print("창 이동 완료")
 
-            #상품 정보
-            print("상품 정보 찾기 전")
-            productInfo = driver.find_element(By.XPATH, "//div[@class='items']").text
-            print("상품 정보 찾기 완료")
-
             #쇼핑몰 필터링
             print("쇼핑몰 필터링 시작")
-            mall_info = driver.find_element(By.XPATH, "//tr[@class='lowest']/td[@class='mall']/div/a").text
+            a_element = driver.find_element(By.XPATH, "//tr[@class='lowest']/td[@class='mall']/div/a")
+            img_elements = a_element.find_elements(By.TAG_NAME, "img")
+            if img_elements:
+                # img 태그가 있으면 alt 속성 값 가져오기
+                mall_info = img_elements[0].get_attribute("alt")
+                print(f"쇼핑몰 : {mall_info}")
+            else:
+                # img 태그가 없으면 title 속성 값 가져오기
+                mall_info = a_element.get_attribute("title")
+                print(f"쇼핑몰 : {mall_info}")
             if re.match(mall_info, "11번가"):
                 pass
             elif re.match(mall_info, "G마켓"):
@@ -176,6 +177,11 @@ class Crawler:
                 driver.switch_to.window(list_page_handle)
                 print("Back to list page.")
                 continue
+
+            #상품 정보
+            print("상품 정보 찾기 전")
+            productInfo = driver.find_element(By.XPATH, "//div[@class='items']").text
+            print("상품 정보 찾기 완료")
 
             #최저가 사러가기 버튼 클릭 후 이동(상품 상세페이지)
             button = driver.find_element(By.CLASS_NAME, "buy_link")
