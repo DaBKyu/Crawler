@@ -151,7 +151,7 @@ class Crawler:
 
             #쇼핑몰 필터링
             print("쇼핑몰 필터링 시작")
-            a_element = driver.find_element(By.XPATH, "//tr[@class='lowest']/td[@class='mall']/div/a")
+            a_element = driver.find_element(By.XPATH, "//tr[contains(@class, 'lowest')]/td[@class='mall']/div/a")
             img_elements = a_element.find_elements(By.TAG_NAME, "img")
             if img_elements:
                 # img 태그가 있으면 alt 속성 값 가져오기
