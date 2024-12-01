@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium_stealth import stealth
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 from selenium.webdriver.common.action_chains import ActionChains
 from multiprocessing import Pool
@@ -205,13 +205,13 @@ class Crawler:
                 print("G마켓")
                 # 썸네일
                 thumbnail_elements = driver.find_elements(By.CSS_SELECTOR, "ul.viewer img")
-                isSuccess = self.thumbDownAucGma(thumbnail_elements, actions, productNameString, thumbnailFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.thumbDownAucGma(thumbnail_elements, productNameString, thumbnailFile_csvWriter, crawlingName)
                 if not isSuccess:
                     print("썸네일 다운 실패")
                     pass
                 # 상품 정보 이미지
                 iframe = driver.find_element(By.ID, "detail1")
-                isSuccess = self.imgDownAucGma(iframe, "gmarket", driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.imgDownAucGma(iframe, driver, productNameString, infoFile_csvWriter, crawlingName)
                 if not isSuccess:
                     print("이미지 다운 실패")
                     pass
@@ -219,13 +219,13 @@ class Crawler:
                 print("Auction")
                 # 썸네일
                 thumbnail_elements = driver.find_elements(By.CSS_SELECTOR, "ul.viewer img")
-                isSuccess = self.thumbDownAucGma(thumbnail_elements, actions, productNameString, thumbnailFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.thumbDownAucGma(thumbnail_elements, productNameString, thumbnailFile_csvWriter, crawlingName)
                 if not isSuccess:
                     print("썸네일 다운 실패")
                     pass
                 # 상품 정보 이미지
                 iframe = driver.find_element(By.ID, "hIfrmExplainView")
-                isSuccess = self.imgDownAucGma(iframe, "auction", driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.imgDownAucGma(iframe, driver, productNameString, infoFile_csvWriter, crawlingName)
                 if not isSuccess:
                     print("이미지 다운 실패")
                     pass
@@ -233,7 +233,7 @@ class Crawler:
                 print("11번가")
                 # 썸네일
                 thumbnail_elements = driver.find_elements(By.XPATH, "//div[@id='productImg']/div/img")
-                isSuccess = self.thumbDownAucGma(thumbnail_elements, actions, productNameString, thumbnailFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.thumbDownAucGma(thumbnail_elements, productNameString, thumbnailFile_csvWriter, crawlingName)
                 if not isSuccess:
                     print("썸네일 다운 실패")
                     pass
@@ -242,7 +242,7 @@ class Crawler:
                     # iframe 존재 여부 확인
                     iframe = driver.find_element(By.ID, "prdDescIfrm")
                     print("iframe이 발견되었습니다. iframe 내부 이미지를 처리합니다.")
-                    isSuccess = self.imgDownAucGma(iframe, "11st", driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess)
+                    isSuccess = self.imgDownAucGma(iframe, driver, productNameString, infoFile_csvWriter, crawlingName)
                     if not isSuccess:
                         print("이미지 다운 실패")
                         pass
@@ -250,7 +250,7 @@ class Crawler:
                     # iframe이 없는 경우 처리
                     print("iframe이 발견되지 않았습니다. iframe 외부 이미지를 처리합니다.")
                     prod_images = driver.find_elements(By.XPATH, "//div[@class='prdc_bo_detail']//img")
-                    isSuccess = self.imgDownCoupang(prod_images, driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess)
+                    isSuccess = self.imgDownCoupang(prod_images, driver, productNameString, infoFile_csvWriter, crawlingName)
                     if not isSuccess:
                         print("이미지 다운 실패")
                         pass
@@ -262,13 +262,13 @@ class Crawler:
                 # 썸네일
                 thumbnail_image = driver.find_element(By.CLASS_NAME, "prod-image__detail")
                 thumbnail_elements = driver.find_elements(By.CLASS_NAME, "prod-image__item")
-                isSuccess = self.thumbDownCoupang(thumbnail_image, thumbnail_elements, actions, productNameString, thumbnailFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.thumbDownCoupang(thumbnail_image, thumbnail_elements, productNameString, thumbnailFile_csvWriter, crawlingName, actions)
                 if not isSuccess:
                     print("썸네일 다운 실패")
                     pass
                 # 상품 정보 이미지
                 prod_images = driver.find_elements(By.XPATH, "//div[@class='product-detail-content-inside']//img")
-                isSuccess = self.imgDownCoupang(prod_images, driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess)
+                isSuccess = self.imgDownCoupang(prod_images, driver, productNameString, infoFile_csvWriter, crawlingName)
                 if not isSuccess:
                     print("이미지 다운 실패")
                     pass
@@ -312,108 +312,185 @@ class Crawler:
         print("Crawling Finish: " + crawlingName)
     
     # 썸네일
-    def thumbDownAucGma(self, thumbnail_elements, actions, productNameString, thumbnailFile_csvWriter, crawlingName, isSuccess):
+    def thumbDownAucGma(self, thumbnail_elements, productNameString, thumbnailFile_csvWriter, crawlingName):
+
+        imgSuccess = True   # 전체 이미지 다운 성공 여부
+        image_records = []  # 임시 이미지 저장 리스트
 
         # 카테고리별 폴더 생성
         category_folder = os.path.join(THUMBS_PATH, crawlingName)
         if not os.path.exists(category_folder):
-            os.makedirs(category_folder)  # 카테고리 폴더가 없으면 생성
+            os.makedirs(category_folder)    # 카테고리 폴더가 없으면 생성
         
         for idx, img in enumerate(thumbnail_elements):
             time.sleep(random.uniform(2, 4))
 
             img_url = img.get_attribute("src")
-            if img_url.startswith("//"):  # URL이 //로 시작하면 http 추가
+            if not img_url:
+                print("이미지 URL이 비어 있음, 건너뜀.")
+                continue
+
+            # URL이 //로 시작하면 http 추가
+            if img_url.startswith("//"):
                 img_url = "https:" + img_url
+
+            # URL 유효성 검사
+            try:
+                response = requests.head(img_url, timeout=2)
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "image" not in content_type:
+                    print(f"유효하지 않은 이미지 URL: {img_url}")
+                    continue
+            except requests.RequestException as e:
+                print(f"URL 확인 실패: {e}, URL: {img_url}")
+                continue
 
             # 이미지 요청
             try:
-                response = requests.get(img_url, timeout=4)
-                response.raise_for_status()  # 상태 코드 확인
+                response = requests.get(img_url, timeout=2)
+                response.raise_for_status() # 상태 코드 확인
                 image = Image.open(BytesIO(response.content))
-                if response.status_code == 200:
-                    file_extension = image.format.lower()  # 'jpeg', 'png' 등의 형식 반환
-                    orgProductThumbFileName = productNameString + "_productImage_" + str(idx) + file_extension
-                    storedPrdocutThumbFileName = uuid.uuid4().hex+ file_extension
-                    file_path = os.path.join(category_folder, f"{storedPrdocutThumbFileName}.{file_extension}")
-                    image.save(file_path)
-                    print(f"썸네일 다운로드 완료: {file_path}")
+                file_extension = image.format.lower()   # 'jpeg', 'png' 등의 형식 반환
+                if not file_extension:
+                    print(f"확장자 확인 실패: {img_url}")
+                    continue
+
+                orgProductThumbFileName = productNameString + "_productImage_" + str(idx) + file_extension
+                storedPrdocutThumbFileName = uuid.uuid4().hex+ file_extension
+                file_path = os.path.join(category_folder, f"{storedPrdocutThumbFileName}.{file_extension}")
+                
+                image.save(file_path)
+                print(f"썸네일 다운로드 완료: {file_path}")
                 # csv에 저장
                 isThumb = "N"
                 if idx == 0:
                     isThumb = "Y"
-                thumbnailFile_csvWriter.writerow([self.productSeqno, orgProductThumbFileName, storedPrdocutThumbFileName, isThumb])
-                isSuccess = True
+                    
+                # 임시 리스트에 저장
+                image_records.append([self.productSeqno, orgProductThumbFileName, storedPrdocutThumbFileName, isThumb])
+            except UnidentifiedImageError:
+                imgSuccess = False
+                print(f"이미지 식별 실패: {img_url}")
+                break
             except requests.exceptions.HTTPError as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"HTTP 에러 발생: {e}, URL: {img_url}")
-                return isSuccess
+                break
             except requests.exceptions.RequestException as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"요청 실패: {e}, URL: {img_url}")
-                return isSuccess
-        return isSuccess
+                break
+
+        # 모든 이미지 다운로드 성공 시만 CSV 기록
+        if imgSuccess:
+            for record in image_records:
+                thumbnailFile_csvWriter.writerow(record)
+            print(f"{len(image_records)}개의 썸네일 데이터를 CSV에 기록했습니다.")
+        else:
+            print("오류 발생으로 이미지 데이터 기록을 취소합니다.")
+            
+        return imgSuccess
 
     
     # 쿠팡 썸네일
-    def thumbDownCoupang(self, thumbnail_img, thumbnail_elements, actions, productNameString, thumbnailFile_csvWriter, crawlingName, isSuccess):
+    def thumbDownCoupang(self, thumbnail_img, thumbnail_elements, productNameString, thumbnailFile_csvWriter, crawlingName, actions):
+
+        imgSuccess = True   # 전체 이미지 다운 성공 여부
+        image_records = []  # 임시 이미지 저장 리스트
 
         # 카테고리별 폴더 생성
         category_folder = os.path.join(THUMBS_PATH, crawlingName)
         if not os.path.exists(category_folder):
-            os.makedirs(category_folder)  # 카테고리 폴더가 없으면 생성
+            os.makedirs(category_folder)    # 카테고리 폴더가 없으면 생성
 
         for idx, img in enumerate(thumbnail_elements):
-            # 썸네일 마우스 이동
-            actions.move_to_element(img)
+            print("썸네일 이미지 다운 시작")
+            actions.move_to_element(img)    # 마우스 이동(이미지 선택)
             time.sleep(random.uniform(2, 4))
 
             img_url = thumbnail_img.get_attribute("src")
-            if img_url.startswith("//"):  # URL이 //로 시작하면 http 추가
+            if not img_url:
+                print("이미지 URL이 비어 있음, 건너뜀.")
+                continue
+
+            # URL이 //로 시작하면 http 추가
+            if img_url.startswith("//"):
                 img_url = "https:" + img_url
+
+            # URL 유효성 검사
+            try:
+                response = requests.head(img_url, timeout=2)
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "image" not in content_type:
+                    print(f"유효하지 않은 이미지 URL: {img_url}")
+                    continue
+            except requests.RequestException as e:
+                print(f"URL 확인 실패: {e}, URL: {img_url}")
+                continue
 
             # 이미지 요청
             try:
-                response = requests.get(img_url, timeout=4)
-                response.raise_for_status()  # 상태 코드 확인
+                response = requests.get(img_url, timeout=2)
+                response.raise_for_status() # 상태 코드 확인
                 image = Image.open(BytesIO(response.content))
-                if response.status_code == 200:
-                    file_extension = image.format.lower()  # 'jpeg', 'png' 등의 형식 반환
-                    orgProductThumbFileName = productNameString + "_productImage_" + str(idx) + file_extension
-                    storedPrdocutThumbFileName = uuid.uuid4().hex+ file_extension
-                    file_path = os.path.join(category_folder, f"{storedPrdocutThumbFileName}.{file_extension}")
-                    image.save(file_path)
-                    print(f"썸네일 다운로드 완료: {file_path}")
+                file_extension = image.format.lower()   # 'jpeg', 'png' 등의 형식 반환
+                if not file_extension:
+                    print(f"확장자 확인 실패: {img_url}")
+                    continue
+
+                orgProductThumbFileName = productNameString + "_productImage_" + str(idx) + file_extension
+                storedPrdocutThumbFileName = uuid.uuid4().hex+ file_extension
+                file_path = os.path.join(category_folder, f"{storedPrdocutThumbFileName}.{file_extension}")
+                
+                image.save(file_path)
+                print(f"썸네일 다운로드 완료: {file_path}")
                 # csv에 저장
                 isThumb = "N"
                 if idx == 0:
                     isThumb = "Y"
-                thumbnailFile_csvWriter.writerow([self.productSeqno, orgProductThumbFileName, storedPrdocutThumbFileName, isThumb])
-                isSuccess = True
+                    
+                # 임시 리스트에 저장
+                image_records.append([self.productSeqno, orgProductThumbFileName, storedPrdocutThumbFileName, isThumb])
+            except UnidentifiedImageError:
+                imgSuccess = False
+                print(f"이미지 식별 실패: {img_url}")
+                break
             except requests.exceptions.HTTPError as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"HTTP 에러 발생: {e}, URL: {img_url}")
-                return isSuccess
+                break
             except requests.exceptions.RequestException as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"요청 실패: {e}, URL: {img_url}")
-                return isSuccess
-        return isSuccess
+                break
+
+        # 모든 이미지 다운로드 성공 시만 CSV 기록
+        if imgSuccess:
+            for record in image_records:
+                thumbnailFile_csvWriter.writerow(record)
+            print(f"{len(image_records)}개의 썸네일 데이터를 CSV에 기록했습니다.")
+        else:
+            print("오류 발생으로 이미지 데이터 기록을 취소합니다.")
+            
+        return imgSuccess
                 
 
     #제품 정보 사진
-    def imgDownAucGma(self, iframe, shop, driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess):
+    def imgDownAucGma(self, iframe, driver, productNameString, infoFile_csvWriter, crawlingName):
+
+        imgSuccess = True   # 전체 이미지 다운 성공 여부
+        image_records = []  # 임시 이미지 저장 리스트
 
         # 카테고리별 폴더 생성
         category_folder = os.path.join(IMAGES_PATH, crawlingName)
         if not os.path.exists(category_folder):
-            os.makedirs(category_folder)  # 카테고리 폴더가 없으면 생성
+            os.makedirs(category_folder)    # 카테고리 폴더가 없으면 생성
 
         # 스크롤 추가: 페이지 끝까지 무작위 간격으로 스크롤
-        for _ in range(5):  # 5번 정도 스크롤을 시도
+        for _ in range(3):  # 3번 정도 스크롤을 시도
             scroll_position = random.randint(200, 800)  # 스크롤 길이 무작위 설정
             driver.execute_script(f"window.scrollBy(0, {scroll_position});")
-            time.sleep(random.uniform(2, 4))  # 무작위 대기 시간 추가
+            time.sleep(random.uniform(2, 4))    # 무작위 대기 시간 추가
 
         #iframe으로 이동
         driver.switch_to.frame(iframe)
@@ -431,83 +508,145 @@ class Crawler:
 
             # 스크롤 이동: 요소가 화면에 나타나도록
             driver.execute_script("arguments[0].scrollIntoView();", img)
-            time.sleep(0.5)  # 스크롤 후 잠시 대기
-
             time.sleep(random.uniform(1, 2))
 
             img_url = img.get_attribute("src")
+            if not img_url:
+                print("이미지 URL이 비어 있음, 건너뜀.")
+                continue
+            
+            # URL 유효성 검사
+            try:
+                response = requests.head(img_url, timeout=2)
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "image" not in content_type:
+                    print(f"유효하지 않은 이미지 URL: {img_url}")
+                    continue
+            except requests.RequestException as e:
+                print(f"URL 확인 실패: {e}, URL: {img_url}")
+                continue
 
             # 이미지 요청
             try:
-                response = requests.get(img_url, timeout=4)
-                response.raise_for_status()  # 상태 코드 확인
+                response = requests.get(img_url, timeout=2)
+                response.raise_for_status() # 상태 코드 확인
                 image = Image.open(BytesIO(response.content))
-                if response.status_code == 200:
-                    file_extension = image.format.lower()  # 'jpeg', 'png' 등의 형식 반환
-                    orgProductImageFileName = productNameString + "_productImage_" + str(idx) + file_extension
-                    storedPrdocutImageFileName = uuid.uuid4().hex+ file_extension
-                    file_path = os.path.join(category_folder, f"{storedPrdocutImageFileName}.{file_extension}")
-                    image.save(file_path)
-                    print(f"이미지 다운로드 완료: {file_path}")
-                # csv에 저장
-                infoFile_csvWriter.writerow([self.productSeqno, orgProductImageFileName, storedPrdocutImageFileName])
-                isSuccess = True
+                file_extension = image.format.lower()   # 'jpeg', 'png' 등의 형식 반환
+                if not file_extension:
+                    print(f"확장자 확인 실패: {img_url}")
+                    continue
+
+                orgProductImageFileName = productNameString + "_productImage_" + str(idx) + file_extension
+                storedPrdocutImageFileName = uuid.uuid4().hex+ file_extension
+                file_path = os.path.join(category_folder, f"{storedPrdocutImageFileName}.{file_extension}")
+
+                image.save(file_path)
+                print(f"이미지 다운로드 완료: {file_path}")
+
+                # 임시 리스트에 저장
+                image_records.append([self.productSeqno, orgProductImageFileName, storedPrdocutImageFileName])
+            except UnidentifiedImageError:
+                imgSuccess = False
+                print(f"이미지 식별 실패: {img_url}")
+                break
             except requests.exceptions.HTTPError as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"HTTP 에러 발생: {e}, URL: {img_url}")
-                return isSuccess
+                break
             except requests.exceptions.RequestException as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"요청 실패: {e}, URL: {img_url}")
-                return isSuccess
+                break
+        
+        # 모든 이미지 다운로드 성공 시만 CSV 기록
+        if imgSuccess:
+            for record in image_records:
+                infoFile_csvWriter.writerow(record)
+            print(f"{len(image_records)}개의 이미지 데이터를 CSV에 기록했습니다.")
+        else:
+            print("오류 발생으로 이미지 데이터 기록을 취소합니다.")
         
         driver.switch_to.default_content()
-        return isSuccess
+        return imgSuccess
 
         
     # 쿠팡 제품 정보 이미지
-    def imgDownCoupang(self, imgs, driver, actions, productNameString, infoFile_csvWriter, crawlingName, isSuccess):
+    def imgDownCoupang(self, imgs, driver, productNameString, infoFile_csvWriter, crawlingName):
+
+        imgSuccess = True   # 전체 이미지 다운 성공 여부
+        image_records = []  # 임시 이미지 저장 리스트
 
         # 카테고리별 폴더 생성
         category_folder = os.path.join(IMAGES_PATH, crawlingName)
         if not os.path.exists(category_folder):
-            os.makedirs(category_folder)  # 카테고리 폴더가 없으면 생성
+            os.makedirs(category_folder)    # 카테고리 폴더가 없으면 생성
+
+        # 스크롤 추가: 페이지 끝까지 무작위 간격으로 스크롤
+        for _ in range(3):  # 3번 정도 스크롤을 시도
+            scroll_position = random.randint(200, 800)  # 스크롤 길이 무작위 설정
+            driver.execute_script(f"window.scrollBy(0, {scroll_position});")
+            time.sleep(random.uniform(2, 4))  # 무작위 대기 시간 추가
 
         for idx, img in enumerate(imgs):
-            # 스크롤 추가: 페이지 끝까지 무작위 간격으로 스크롤
-            for _ in range(5):  # 5번 정도 스크롤을 시도
-                scroll_position = random.randint(200, 800)  # 스크롤 길이 무작위 설정
-                driver.execute_script(f"window.scrollBy(0, {scroll_position});")
-                time.sleep(random.uniform(2, 4))  # 무작위 대기 시간 추가
-            # 마우스 이동 시뮬레이션
-            time.sleep(random.uniform(2, 4))
+            print("상세 이미지 다운 시작")
 
             img_url = img.get_attribute("src")
+            if not img_url:
+                print("이미지 URL이 비어 있음, 건너뜀.")
+                continue
+
+            # URL 유효성 검사
+            try:
+                response = requests.head(img_url, timeout=2)
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "image" not in content_type:
+                    print(f"유효하지 않은 이미지 URL: {img_url}")
+                    continue
+            except requests.RequestException as e:
+                print(f"URL 확인 실패: {e}, URL: {img_url}")
+                continue
 
             # 이미지 요청
             try:
-                response = requests.get(img_url, timeout=4)
+                response = requests.get(img_url, timeout=2)
                 response.raise_for_status()  # 상태 코드 확인
                 image = Image.open(BytesIO(response.content))
-                if response.status_code == 200:
-                    file_extension = image.format.lower()  # 'jpeg', 'png' 등의 형식 반환
-                    orgProductImageFileName = productNameString + "_productImage_" + str(idx) + file_extension
-                    storedPrdocutImageFileName = uuid.uuid4().hex+ file_extension
-                    file_path = os.path.join(category_folder, f"{storedPrdocutImageFileName}.{file_extension}")
-                    image.save(file_path)
-                    print(f"이미지 다운로드 완료: {file_path}")
-                # csv에 저장
-                infoFile_csvWriter.writerow([self.productSeqno, orgProductImageFileName, storedPrdocutImageFileName])
-                isSuccess = True
+                file_extension = image.format.lower()  # 'jpeg', 'png' 등의 형식 반환
+                if not file_extension:
+                    print(f"확장자 확인 실패: {img_url}")
+                    continue
+
+                orgProductImageFileName = productNameString + "_productImage_" + str(idx) + file_extension
+                storedPrdocutImageFileName = uuid.uuid4().hex+ file_extension
+                file_path = os.path.join(category_folder, f"{storedPrdocutImageFileName}.{file_extension}")
+
+                image.save(file_path)
+                print(f"이미지 다운로드 완료: {file_path}")
+
+                # 임시 리스트에 저장
+                image_records.append([self.productSeqno, orgProductImageFileName, storedPrdocutImageFileName])
+            except UnidentifiedImageError:
+                imgSuccess = False
+                print(f"이미지 식별 실패: {img_url}")
+                break
             except requests.exceptions.HTTPError as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"HTTP 에러 발생: {e}, URL: {img_url}")
-                return isSuccess
+                break
             except requests.exceptions.RequestException as e:
-                isSuccess = False
+                imgSuccess = False
                 print(f"요청 실패: {e}, URL: {img_url}")
-                return isSuccess
-        return isSuccess
+                break
+
+        # 모든 이미지 다운로드 성공 시만 CSV 기록
+        if imgSuccess:
+            for record in image_records:
+                infoFile_csvWriter.writerow(record)
+            print(f"{len(image_records)}개의 이미지 데이터를 CSV에 기록했습니다.")
+        else:
+            print("오류 발생으로 이미지 데이터 기록을 취소합니다.")
+        
+        return imgSuccess
 
 
     def CreateCSV(self):
